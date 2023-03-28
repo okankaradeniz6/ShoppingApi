@@ -26,7 +26,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private ModelMapper modelMapper;
-    private final WebClient webClient;
+    private final WebClient.Builder webClientBuilder;
     public void placeOrder(OrderRequest orderRequest) throws IllegalAccessException {
 
         Order order = new Order();
@@ -45,25 +45,21 @@ public class OrderService {
                 .toList();
 
         //check if, are there items in the stock or not by calling inventory-ms
-        InventoryResponse[] inventoryResponsesArray = webClient.get()
-                        .uri("http://localhost:8082/api/inventory",
+        InventoryResponse[] inventoryResponsesArray = webClientBuilder.build().get()
+                        .uri("http://inventory-service/api/inventory",
                                 uriBuilder -> uriBuilder.queryParam("skuCode", skuCodes).build())
                                 .retrieve()
                                         .bodyToMono(InventoryResponse[].class)
                                                 .block();
 
-        log.info("Response: " + Arrays.stream(inventoryResponsesArray).toList().isEmpty());
         //If the inventoryResponseArray is empty, allMatch gives true, we need to prevent
         //that by check whether the array is empty or not.
         boolean allProductsIsInStock = !Arrays.stream(inventoryResponsesArray).toList().isEmpty() && Arrays.stream(inventoryResponsesArray)
                 .allMatch(InventoryResponse::isInStock);
-        log.info("allProducts is in stock " + allProductsIsInStock);
         if(allProductsIsInStock){
             orderRepository.save(order);
         } else {
             throw new IllegalArgumentException("In stock, we don't have this items, please try again");
         }
-
-
     }
 }
